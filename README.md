@@ -21,7 +21,7 @@ npx skills add tower/agent-skills
 
 | Skill | What it does |
 |---|---|
-| [`tower-ingest`](skills/tower-ingest/SKILL.md) | Gets data **into** the lakehouse. Builds ingestion pipelines (usually with [dlt](https://dlthub.com)) that land raw data from APIs, databases, SaaS tools, and files into Iceberg tables, then deploys and schedules them on Tower's managed compute. Credentials live in Tower secrets — never in code, config, or chat. |
+| [`tower-ingest`](skills/tower-ingest/SKILL.md) | Gets data **into** the lakehouse. Builds ingestion pipelines that land raw data from APIs, databases, SaaS tools, and files into Iceberg tables, then deploys and schedules them on Tower's managed compute. Credentials live in Tower secrets and never in code, config, or chat. |
 | [`tower-data`](skills/tower-data/SKILL.md) | Gets answers **out** of the lakehouse. Vends a short-lived, read-only credential, attaches the Iceberg catalog in [DuckDB](https://duckdb.org), and answers questions with SQL you can audit. The agent never touches the source systems. |
 
 Together they cover the full loop: source → governed lakehouse → answer. Tower sits in the middle, so every run has a status, history, and logs, and access is scoped and auditable.
@@ -46,24 +46,13 @@ npx skills add tower/agent-skills -a claude-code       # target a specific agent
 npx skills add tower/agent-skills --list               # see what's here first
 ```
 
-## Repository layout
-
-Each skill lives in its own directory under `skills/`, with a `SKILL.md` containing YAML frontmatter (`name`, `description`) followed by the skill instructions:
-
-```
-skills/
-├── tower-ingest/
-│   └── SKILL.md
-└── tower-data/
-    └── SKILL.md
-```
-
 ## Contributing
 
-Issues and pull requests are welcome — these skills are meant to improve through real use. See [CONTRIBUTING.md](CONTRIBUTING.md) for how to add a skill and [AGENTS.md](AGENTS.md) for the design principles every data skill here follows.
+Issues and pull requests are welcome. These skills are meant to improve through real use. See [CONTRIBUTING.md](CONTRIBUTING.md) for how to add a skill and [AGENTS.md](AGENTS.md) for the design principles every data skill here follows.
 
 ## Learn more
 
+- [Learn more about Tower](https://tower.dev)
 - [Tower documentation](https://docs.tower.dev)
 - [Make Every Agent a Data Agent](https://tower.dev/blog/make-every-agent-a-data-agent) — the announcement post
 
