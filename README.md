@@ -33,7 +33,7 @@ npx skills add tower/agent-skills --list
 | Skill | Description |
 |---|---|
 | [`tower-ingest`](skills/tower-ingest/SKILL.md) | Author, test, deploy, and schedule data ingestion pipelines on Tower that land external data (APIs, databases, SaaS tools, files) into a Tower-managed Apache Iceberg lakehouse. |
-| [`tower-analyze`](skills/tower-analyze/SKILL.md) | Analyze data in the Tower lakehouse. |
+| [`tower-data`](skills/tower-data/SKILL.md) | Query and analyze data in a Tower-managed Apache Iceberg lakehouse using DuckDB and short-lived, read-only credentials vended by the Tower CLI. |
 
 ## Repository layout
 
@@ -43,7 +43,7 @@ Each skill lives in its own directory under `skills/`, with a `SKILL.md` contain
 skills/
 ├── tower-ingest/
 │   └── SKILL.md
-└── tower-analyze/
+└── tower-data/
     └── SKILL.md
 ```
 
