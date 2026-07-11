@@ -1,7 +1,9 @@
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/tower-logo-light.png">
-  <img src="assets/tower-logo-dark.png" alt="Tower" width="140">
-</picture>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/tower-logo-light.png">
+    <img src="assets/tower-logo-dark.png" alt="Tower" width="280">
+  </picture>
+</p>
 
 # Make every agent a data agent
 
