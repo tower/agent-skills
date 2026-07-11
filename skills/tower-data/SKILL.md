@@ -7,7 +7,26 @@ description: Query and analyze data in a Tower-managed Apache Iceberg lakehouse 
 
 Tower manages Apache Iceberg lakehouses. This skill lets you answer questions about the user's business data by vending short-lived, scoped credentials from Tower and querying the lakehouse locally with DuckDB.
 
-**Core loop: vend read-only credentials → attach the catalog in DuckDB → discover tables → query → answer in plain language.**
+**Core loop: run SQL through `query.sh` (vends credentials + attaches DuckDB in one shot) → discover tables → query → answer in plain language.**
+
+## Fast path (use this)
+
+`query.sh` in this skill's directory does vend → attach → execute in a single command. SQL goes in on stdin; the catalog is attached as `lakehouse`:
+
+```bash
+echo "SHOW ALL TABLES;" | <skill-dir>/query.sh              # catalog=default, env=default
+<skill-dir>/query.sh my-catalog production < analysis.sql   # explicit catalog + environment
+```
+
+Each invocation vends fresh short-lived credentials, so token expiry and shell-state loss between commands are non-issues — just call it again. The token stays inside the script's environment and is never printed.
+
+Batch related statements into ONE invocation (discovery + sanity checks together, then the analysis) rather than one call per statement — each call pays the vend + attach cost (~2s). For multi-pass analysis over the same big table, `CREATE TEMP TABLE t AS SELECT <cols> FROM lakehouse...` once, then query the temp table — repeated scans and `NOT IN (SELECT ...)` subqueries against Iceberg-attached tables are slow and have caused mid-batch crashes.
+
+Steps 2–3 below describe what the script does; use them only if it's unavailable or you need a persistent interactive session.
+
+## Before you query: check for saved semantics
+
+Business questions often have team-specific definitions (e.g. which users count as "internal", how "active" is defined) that are not derivable from schemas. Check agent memory / prior analyses for saved definitions before inventing a filter, and when the user confirms a definition, save it for next time.
 
 ## Security rules (non-negotiable)
 
@@ -41,7 +60,9 @@ tower catalogs list
 
 `tower catalogs show <name>` displays the catalog's type, environment, and property names if you need more detail. Note the **environment** — pass it explicitly in the next step if it isn't `default`.
 
-## Step 2: Vend short-lived read credentials
+## Step 2: Vend short-lived read credentials (manual path)
+
+Note: `export` only survives within a single shell invocation — in harnesses where each command runs in a fresh shell, vend and query must happen in the same call (this is exactly what `query.sh` does).
 
 ```bash
 export TOWER_CATALOG_TOKEN="$(tower --json catalogs credentials <CATALOG> --environment <ENV> --mode read | python3 -c 'import json,sys; print(json.load(sys.stdin)["credentials"]["oauth_token"])')"
@@ -105,7 +126,8 @@ SELECT COUNT(*), MIN(<date_col>), MAX(<date_col>) FROM lakehouse.gold.<table>;
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| 401/403 mid-session | Token expired | Re-vend (step 2), re-attach |
+| 401/403 mid-session | Token expired | Re-run `query.sh` (fresh vend per call); manual path: re-vend (step 2), re-attach |
+| Exit 141 (SIGPIPE) or silent death mid-batch | Heavy repeated scans of Iceberg tables in one batch | Materialize a temp table first, split the batch, re-run |
 | `ATTACH` fails / HTTP error | Wrong endpoint or warehouse | Re-read values from step 2 JSON; check `--environment` |
 | S3 access error on scan | Wrong region | Set `s3_region` / `DEFAULT_REGION` to the lakehouse region |
 | Table not found | Wrong namespace | Re-run discovery (step 4); check spelling of namespace |
