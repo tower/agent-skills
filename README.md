@@ -9,13 +9,13 @@
 
 # Make every agent a data agent
 
-[![Validate skills](https://github.com/tower/agent-skills/actions/workflows/test.yml/badge.svg)](https://github.com/tower/agent-skills/actions/workflows/test.yml)
-
 Open-source [Agent Skills](https://github.com/vercel-labs/skills) that teach AI agents (Claude Code, Cursor, and other skills-compatible agents) how to do useful data work with [Tower](https://tower.dev): ingest enterprise data into a governed, open lakehouse built on Apache Iceberg, and delegate access to your team with Tower securely. 
 
 ```bash
 npx skills add tower/agent-skills
 ```
+
+[![Integration tests](https://github.com/tower/agent-skills/actions/workflows/test.yml/badge.svg)](https://github.com/tower/agent-skills/actions/workflows/test.yml)
 
 ## The skills
 
