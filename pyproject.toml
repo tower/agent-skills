@@ -1,0 +1,19 @@
+[project]
+name = "tower-agent-skills"
+version = "0.1.0"
+description = "Validation tests for the Tower agent skills catalog"
+requires-python = ">=3.10"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "pyyaml>=6",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "integration: tests that shell out to external tools (node/npx); deselect with -m 'not integration'",
+]
+addopts = "-m 'not integration'"

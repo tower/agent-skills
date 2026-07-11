@@ -14,7 +14,7 @@ Build ingestion pipelines as Tower apps: Python (preferably dlt) extracts from a
 1. **Secrets never appear in code, Towerfiles, or chat.** Credentials live in Tower secrets, injected as environment variables at runtime. Follow the Secrets Protocol below — do not write code that needs a credential before the secret exists.
 2. **Idempotent by default.** Every pipeline must be safe to re-run: use merge/upsert write modes or explicit deduplication. Schedules retry; design for it.
 3. **Land raw data in a `bronze` namespace** (e.g. `bronze.stripe_invoices`). Transformations to silver/gold are a separate app (dbt or Polars), not the ingestion app's job.
-4. **Never edit Towerfile TOML by hand.** Use the Tower MCP tools (`tower_file_generate`, `tower_file_update`, `tower_file_add_parameter`, `tower_file_validate`) or CLI equivalents.
+4. **Prefer the Tower MCP tools for Towerfile edits** (`tower_file_generate`, `tower_file_update`, `tower_file_add_parameter`, `tower_file_validate`). If the MCP tools are not connected (check before assuming), the CLI has no Towerfile generator — write the TOML by hand from the template in Step 2.
 5. **Discover, don't assume.** Check what catalogs, secrets, and apps already exist before creating new ones.
 
 ## Prerequisites
@@ -27,6 +27,8 @@ tower apps list         # avoid duplicate app names
 ```
 
 If the CLI is missing: `pip install tower`. If unauthenticated: the user must run `tower login` (opens a browser). If Tower MCP tools (`tower_*`) are available, prefer them over raw CLI.
+
+**If `tower catalogs list` shows no Tower-managed catalog, stop here.** Catalog creation is UI-only — there is no `tower catalogs create` and no MCP tool for it; don't hunt for one or upgrade the CLI looking for it. Send the user to the Tower web app to create the lakehouse catalog, then confirm with `tower catalogs list` before writing any pipeline code. A missing catalog surfaces later as `Failed to vend credentials for Tower catalog '<slug>' in environment '<env>': Not found` on every table operation.
 
 ## Step 1: Clarify the job
 
@@ -42,13 +44,43 @@ Confirm with the user before writing code:
 mkdir <app-name> && cd <app-name> && uv init
 ```
 
-Keep `pyproject.toml` minimal — `[project]` metadata and dependencies only (e.g. `dlt`, `pyarrow`, `tower`). No `[build-system]` sections. Also write a `requirements.txt` mirroring the dependencies (Tower installs from it at runtime).
+Keep `pyproject.toml` minimal — `[project]` metadata and dependencies only. No `[build-system]` sections. Also write a `requirements.txt` mirroring the dependencies (Tower installs from it at runtime).
+
+Declare the full dependency set up front — missing packages only surface as `crashed` runs in the cloud, one per deploy cycle. For the common Postgres/MySQL → lakehouse path the working set is:
+
+```
+dlt[sql-database]    # pulls in sqlalchemy
+psycopg2-binary      # or the driver for your database
+pyarrow
+polars               # reading cursor state back from target tables
+tower                # the SDK's Iceberg table support pulls in pyiceberg
+```
 
 Then generate and configure the Towerfile:
 
 ```
 tower_file_generate → tower_file_update (name, script, description, source globs)
 → tower_file_add_parameter (for runtime knobs) → tower_file_validate
+```
+
+If the MCP tools aren't available, write the Towerfile by hand:
+
+```toml
+[app]
+name = "ingest-<source>"
+script = "./main.py"
+source = ["./*.py", "./requirements.txt"]
+description = "Ingest <source> into the Tower lakehouse (bronze namespace)"
+
+[[parameters]]
+name = "window_days"
+description = "Extraction window size in days for large-table backfill"
+default = "14"
+
+[[parameters]]
+name = "reset_tables"
+description = "If 'true', drop all target tables before ingesting (schema reset)"
+default = "false"
 ```
 
 Use **parameters** for non-secret runtime configuration the user may want to vary per run or per schedule: date ranges for backfills, table lists, write mode. Access in code with `tower.parameter("name")`. Use **hidden parameters** (`hidden=true`, no default) only for sensitive values that vary per invocation; standing credentials belong in secrets, not parameters.
@@ -106,6 +138,10 @@ Alternative pattern: if the team standardizes on a dlt destination directly (e.g
 
 Incremental loads: persist a cursor (e.g. `max(updated_at)` read from the target table via `to_polars()`) rather than relying on local state — runners are ephemeral and runs must be stateless.
 
+**Large tables (roughly >100k rows): window the backfill.** Extracting a whole table into memory crashes the runner. Instead, iterate fixed time windows over a timestamp column (`created_at`/`updated_at`) and upsert each window before fetching the next — each window is one short source query and one commit, so a crashed run resumes from the cursor instead of starting over. Make the window size a parameter (e.g. `window_days`, default 14) and log per window (`<table>: window <start> +14d -> <n> rows`) so progress is visible in run logs.
+
+**Schema resets.** `create_if_not_exists` pins the table to the first schema it ever saw; if the extracted schema later changes (added columns, type fixes), upserts fail with field mismatches. Add a `reset_tables` parameter (default `"false"`) that drops and recreates the target tables, so a one-time reset is a run parameter instead of a code change.
+
 ## Step 5: Test locally
 
 ```
@@ -126,6 +162,8 @@ Then confirm the run exited cleanly:
 tower_apps_show <app>       # recent runs and statuses
 tower_apps_logs <app>#<n>   # logs for a specific run
 ```
+
+In the shell, quote the run reference (`tower apps logs 'ingest-postgres#7'`) — `#` starts a comment otherwise. Log timestamps are UTC; don't diagnose a stall by comparing them to local wall-clock time.
 
 Run status meanings: `exited` = success; `crashed` = your code failed (non-zero exit); `errored` = infrastructure failure; `retrying` = a retry policy is in effect. Time in `starting` is cold-start, not your code. Configure a retry policy for scheduled ingestion so transient source/API failures self-heal.
 
@@ -157,7 +195,10 @@ Or hand off to the **tower-data** skill (vend read credentials, query with DuckD
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | dlt can't find credentials | Secret name doesn't match dlt's env-var convention | Rename secret (Step 3 naming); `tower secrets list` to check |
-| Works locally, `crashed` in cloud | Missing dependency in `requirements.txt`, or secret only exists locally/in another environment | Pin deps; check `tower secrets list -a` |
+| `Failed to vend credentials for Tower catalog '...': Not found` | The team has no Tower-managed catalog yet | User must create it in the web app — there is no CLI/MCP command (Prerequisites) |
+| Works locally, `crashed` in cloud | Missing dependency in `requirements.txt`, or secret only exists locally/in another environment | Pin deps (see Step 2 dependency set); check `tower secrets list -a` |
+| Crash mid-extract on a big table | Whole table pulled into memory | Windowed backfill over a timestamp column (Step 4) |
+| Field/schema mismatch on `upsert()` | Target table pinned to an earlier schema by `create_if_not_exists` | Run once with `reset_tables=true` to drop and recreate (Step 4) |
 | Duplicate rows after re-run | Append mode without dedup | Switch to `upsert()` with join columns |
 | Run stuck in `pending` | Self-hosted runner mode enabled but no runner online | Check Settings → Self-Hosted Runners, or start a runner |
 | Table not visible to analysts | Wrong namespace/catalog | Confirm `bronze` namespace in the `default` catalog |

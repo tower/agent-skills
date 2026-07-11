@@ -47,9 +47,10 @@ skills/
     └── SKILL.md
 ```
 
-## Adding a new skill
+## Contributing
 
-1. Create `skills/<skill-name>/SKILL.md`.
-2. Add frontmatter with a unique `name` (lowercase, hyphens) and a `description` that tells the agent when to use the skill.
-3. Write the skill instructions in markdown below the frontmatter.
-4. Add a row to the Skills table above.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for how to add a skill, and [AGENTS.md](AGENTS.md) for repository conventions.
+
+## License
+
+[MIT](LICENSE)
