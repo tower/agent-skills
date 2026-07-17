@@ -1,5 +1,5 @@
 ---
-name: tower-ingest
+name: tower-integration
 description: Author, test, deploy, and schedule data ingestion pipelines on Tower that land external data (APIs, databases, SaaS tools, files) into a Tower-managed Apache Iceberg lakehouse. Use this skill whenever the user wants to ingest, load, sync, extract, or import data into their lakehouse or Tower, mentions dlt/dltHub, connectors, ELT/ETL, or says things like "get our Stripe/Postgres/GitHub/Shopify data into Tower", "build a pipeline", or "keep this data up to date" — even if they don't say "ingestion" explicitly. Covers Tower apps, Towerfiles, parameters, secrets, environments, catalogs, tables, schedules, retries, and multi-app orchestration.
 ---
 
@@ -22,6 +22,7 @@ Build ingestion pipelines as Tower apps: Python (preferably dlt) extracts from a
 ```bash
 tower teams list        # verifies install + auth
 tower catalogs list     # confirm the target catalog (usually `default`, Tower-managed)
+tower catalogs show default   # see which schemas/tables already exist in the catalog
 tower secrets list      # see which secrets already exist (previews only)
 tower apps list         # avoid duplicate app names
 ```
@@ -180,15 +181,14 @@ tower schedules create --app=ingest-<source> --cron="0 6 * * *" --parameter=TABL
 
 ## Step 8: Verify the data landed
 
-Close the loop — never declare success from logs alone. Read the target table back:
+Close the loop — never declare success from logs alone. Read the target table back with the CLI's read-only query command:
 
-```python
-import tower
-df = tower.tables("bronze.<table>").to_polars().collect()
-print(df.height, df.select("<timestamp_col>").max())
+```bash
+tower catalogs show default    # confirm the table now exists
+tower catalogs query default --sql 'SELECT COUNT(*), MAX(<timestamp_col>) FROM "default".bronze.<table>'
 ```
 
-Or hand off to the **tower-data** skill (vend read credentials, query with DuckDB) to run row-count and freshness checks and show the user actual rows. Offer this explicitly: "want me to query it to confirm?"
+For richer checks (sample rows, joins, freshness reports), hand off to the **tower-data** skill. Offer this explicitly: "want me to query it to confirm?"
 
 ## Troubleshooting
 

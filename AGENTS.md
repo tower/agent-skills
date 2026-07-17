@@ -11,7 +11,7 @@ This repository is a catalog of agent skills for [Tower](https://tower.dev), ins
 
 - Frontmatter requires `name` (lowercase, hyphen-separated, must match the directory name and be unique across the repo) and `description`.
 - The `description` is what an agent uses to decide when to load the skill: state what the skill does AND the trigger phrases/situations that should invoke it, including cases where the user doesn't use Tower terminology.
-- Skill names are prefixed `tower-` (e.g. `tower-ingest`, `tower-data`).
+- Skill names are prefixed `tower-` (e.g. `tower-integration`, `tower-data`).
 - Write instructions imperatively, addressed to the agent. Prefer concrete commands and code snippets over prose. Include a troubleshooting section and a "what this skill is not for" section that points to sibling skills.
 - Secrets handling is a hard rule in every skill: credential values never appear in code, config files, or conversation — they live in Tower secrets.
 
@@ -19,7 +19,7 @@ This repository is a catalog of agent skills for [Tower](https://tower.dev), ins
 
 Every skill in this catalog gives an agent access to customer data. New skills must uphold these principles; they exist so a skill author doesn't accidentally relax a guarantee a sibling skill depends on.
 
-1. **Read and write are separate skills with separate credential models.** `tower-data` vends short-lived read-only credentials; `tower-ingest` owns writes via scoped secrets. Never give an analytical skill write credentials or a write skill blanket admin credentials. A new skill must pick a side (or justify why it needs both, with explicit user confirmation before any write).
+1. **Read and write are separate skills with separate credential models.** `tower-data` vends short-lived read-only credentials; `tower-integration` owns writes via scoped secrets. Never give an analytical skill write credentials or a write skill blanket admin credentials. A new skill must pick a side (or justify why it needs both, with explicit user confirmation before any write).
 2. **Secrets never transit the conversation.** Skills instruct the user to create secrets themselves, verify by preview only, and never echo tokens — including into temp files that outlive the command. If a user pastes a credential, store it immediately, never repeat it, and advise rotation.
 3. **Credentials resolve before code is written.** A skill must not have the agent write code that needs a credential that doesn't exist yet — that's how insecure workarounds (.env files, hardcoded fallbacks) get improvised.
 4. **Writes are idempotent and stateless.** Safe to re-run (upsert/merge or explicit dedup); incremental cursors derived from the destination, never from local state — runners are ephemeral.

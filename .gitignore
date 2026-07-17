@@ -1,3 +1,17 @@
+#
+# Garbage
+#
 .DS_Store
+
+
+#
+# Development artifacts
+#
 node_modules/
 __pycache__
+*.sw[onp]
+
+# 
+# Claude stuff
+#
+.claude/settings.local.json
